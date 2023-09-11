@@ -28,9 +28,14 @@ const validName = body("name", "please enter a name of at least 5 chars")
         min: 5,
     });
 
+const validStatus = body("status", "Invalid Status")
+    .trim()
+    .notEmpty({ignore_whitespace: true});
+
 const validSignup = [validName, validEmail, validPass];
 
 module.exports = {
+    validStatus,
     validEmail,
     validName,
     validPass,

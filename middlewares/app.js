@@ -19,6 +19,11 @@ exports.allowCORS = (req, res, next) => {
      * We allowed the client to set `Authorization` Header in order to add authorization in our application
      * Use `*` to allow the client to set any headers
      */
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Posts-Per-Page");
-    next();
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authentication, Posts-Per-Page");
+
+    if (req.method == "OPTIONS") {
+        res.sendStatus(200);
+    } else {
+        next();
+    }
 }

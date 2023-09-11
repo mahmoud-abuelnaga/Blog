@@ -20,11 +20,13 @@ const postSchema = new mongoose.Schema({
 
     imageUrl: {
         type: String,
+        required: true,
         set: (url) => url.trim(),
     },
 
     creator: {
         type: mongoose.Types.ObjectId,
+        required: true,
         ref: "User",
     }
 },

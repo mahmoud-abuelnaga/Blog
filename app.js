@@ -9,20 +9,21 @@ const URI = `mongodb+srv://mahmoud:${process.env.mongodb_cluster0_pass}@cluster0
 
 // routes
 const feedRoutes = require("./routes/feed");
-const authRoutes = require("./routes/auth");
+const userRoutes = require("./routes/user");
 
 // middlewares
 const { allowCORS } = require("./middlewares/app");
+const {isLoggedIn} = require("./middlewares/user");
 
 // app
 const app = express();
-app.use(express.json()); // To parse incoming json data
 app.use(allowCORS);
+app.use(express.json()); // To parse incoming json data
 app.use(express.static(path.join(__dirname, "public")));
 
 // register routes
-app.use("/feed", feedRoutes);
-app.use("/users", authRoutes);
+app.use("/feed", isLoggedIn, feedRoutes);
+app.use("/users", userRoutes);
 
 const main = async () => {
     await mongoose.connect(URI);

@@ -68,13 +68,6 @@ exports.getAllPosts = async (req, res, next) => {
             path: "creator",
             select: "_id name",
         });
-
-        for (let post of posts) {
-            // tmp
-            post._doc.creator = {
-                name: "Mahmoud",
-            };
-        }
     } catch (err) {
         console.log(err);
         return send500Res("Error fetching data from database.");
@@ -117,13 +110,6 @@ exports.getPosts = async (req, res, next) => {
                 path: "creator",
                 select: "_id name",
             });
-
-        for (let post of posts) {
-            // tmp
-            post._doc.creator = {
-                name: "Mahmoud",
-            };
-        }
     } catch (err) {
         console.log(err);
         return send500Res("Error fetching data from database.");
@@ -154,6 +140,7 @@ exports.createPost = async (req, res, next) => {
         return sendErrorRes(res, result, image);
     } else {
         // create a new post
+        req.body.creator = req.user._id;
         try {
             post = await Post.create(req.body);
         } catch (err) {
@@ -176,10 +163,6 @@ exports.createPost = async (req, res, next) => {
             return send500Res("Error saving the image.");
         }
 
-        post._doc.creator = {
-            // tmp
-            name: "Mahmoud",
-        };
         return res.status(201).json({
             message: "Post Created!",
             post,
@@ -207,11 +190,6 @@ exports.getPost = async (req, res, next) => {
         });
     }
     if (post) {
-        post._doc.creator = {
-            // tmp
-            name: "Mahmoud",
-        };
-
         return res.status(200).json({
             message: "Post fetched successfully.",
             post,
@@ -235,26 +213,26 @@ exports.getPost = async (req, res, next) => {
 exports.deletePost = async (req, res, next) => {
     let post;
     try {
-        post = await Post.findByIdAndDelete(req.params.postId);
+        post = await Post.findOneAndDelete({_id: req.params.postId, creator: req.user._id});
     } catch (err) {
         console.log(err);
         return send500Res("Error deleting post from the database");
     }
-
-    try {
-        await fs.unlink(path.join(rootDir, "public", post.imageUrl));
-    } catch (err) {
-        console.log(err);
-    }
-
+    
     if (post) {
+        try {
+            await fs.unlink(path.join(rootDir, "public", post.imageUrl));
+        } catch (err) {
+            console.log(err);
+        }
+
         return res.status(200).json({
             message: "Deleted Post!",
             post,
         });
     } else {
-        return res.status(404).json({
-            message: "Post not found!",
+        return res.status(403).json({
+            message: "Not authorized!",
         });
     }
 };
@@ -279,8 +257,8 @@ exports.editPost = async (req, res, next) => {
         return sendErrorRes(res, result);
     } else {
         try {
-            post = await Post.findByIdAndUpdate(
-                req.params.postId,
+            post = await Post.findOneAndUpdate(
+                {_id: req.params.postId, creator: req.user._id},
                 { title, content },
                 { new: true }
             );
@@ -300,6 +278,7 @@ exports.editPost = async (req, res, next) => {
                     "images",
                     imageName
                 );
+
                 post.imageUrl = path.join("images", imageName);
                 try {
                     post = await post.save();
@@ -313,17 +292,22 @@ exports.editPost = async (req, res, next) => {
                 }
             }
 
-            post._doc.creator = {
-                // tmp
-                name: "Mahmoud",
-            };
             return res.status(200).json({
                 message: "Post updated!",
                 post,
             });
         } else {
-            fs.unlink(image.path);
-            return send404Res(res, "Post not found!");
+            if (image) {
+                try {
+                    await fs.unlink(image.path);
+                } catch (err) {
+                    console.log(err);
+                }
+            }
+            
+            return res.status(403).json({
+                message: "Not authorized!",
+            });
         }
     }
 };

@@ -1,6 +1,7 @@
 // packages
 const mongoose = require("mongoose")
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 
 // models
 const Post = require("./Post");
@@ -30,6 +31,11 @@ const userSchema = new mongoose.Schema({
         set: (status) => status.trim(),
         default: "I am new!",
     },
+
+    secret: {
+        type: String,
+        default: crypto.randomBytes(32).toString("utf-8"),
+    }
 },
 
 {
@@ -51,7 +57,7 @@ const userSchema = new mongoose.Schema({
          * @returns {boolean} Returns true if `pass` matches the hashed password, false otherwise.
          */
         async checkPass(pass) {
-            const isCorrect = await bcrypt.compare(pass, this.pass);
+            const isCorrect = await bcrypt.compare(pass, this.password);
             return isCorrect;
         },
     },

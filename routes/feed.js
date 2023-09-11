@@ -8,6 +8,9 @@ const feedController = require("../controllers/feed");
 // validators
 const { validPost } = require("../validators/post");
 
+// middlewares
+
+
 // constants
 const upload = multer({
     dest: "public/images",
@@ -36,5 +39,6 @@ router.route("/posts/:postId")
     .get(feedController.getPost)
     .patch(upload.single("image"), validPost, feedController.editPost)
     .delete(feedController.deletePost);
+    
 
 module.exports = router;
