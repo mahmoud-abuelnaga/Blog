@@ -20,7 +20,6 @@ const postSchema = new mongoose.Schema({
 
     imageUrl: {
         type: String,
-        required: true,
         set: (url) => url.trim(),
     },
 

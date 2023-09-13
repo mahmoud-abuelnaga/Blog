@@ -7,6 +7,7 @@ const {
 } = require("express-validator");
 const path = require("path");
 const fs = require("fs/promises");
+const socketServer = require("../util/socket");
 
 // models
 const Post = require("../models/Post");
@@ -64,7 +65,7 @@ const sendErrorRes = (res, result, image) => {
 exports.getAllPosts = async (req, res, next) => {
     let posts;
     try {
-        posts = await Post.find().populate({
+        posts = await Post.find().sort({ createdAt: -1 }).populate({
             path: "creator",
             select: "_id name",
         });
@@ -106,6 +107,7 @@ exports.getPosts = async (req, res, next) => {
         posts = await Post.find()
             .skip((page - 1) * postsPerPage)
             .limit(postsPerPage)
+            .sort({ createdAt: -1 }) // sort by createdAt in an descending way
             .populate({
                 path: "creator",
                 select: "_id name",
@@ -157,11 +159,23 @@ exports.createPost = async (req, res, next) => {
             // save imageUrl in database
             post.imageUrl = path.join("images", imageName);
             post = await post.save();
+            post._doc.creator = {
+                _id: req.user._id.toString(),
+                name: req.user.name,
+            };
         } catch (err) {
             console.log(err);
-            await post.deleteOne();
+            if (post) {
+                await post.deleteOne();
+            }
             return send500Res("Error saving the image.");
         }
+
+        // On creating a post, fire `posts` event, so that anyone listening to `posts` event gets notified
+        socketServer.getIO().emit("posts", {
+            action: "create",
+            post,
+        });
 
         return res.status(201).json({
             message: "Post Created!",
@@ -213,18 +227,26 @@ exports.getPost = async (req, res, next) => {
 exports.deletePost = async (req, res, next) => {
     let post;
     try {
-        post = await Post.findOneAndDelete({_id: req.params.postId, creator: req.user._id});
+        post = await Post.findOneAndDelete({
+            _id: req.params.postId,
+            creator: req.user._id,
+        });
     } catch (err) {
         console.log(err);
         return send500Res("Error deleting post from the database");
     }
-    
+
     if (post) {
         try {
             await fs.unlink(path.join(rootDir, "public", post.imageUrl));
         } catch (err) {
             console.log(err);
         }
+
+        socketServer.getIO().emit("posts", {
+            action: "delete",
+            post,
+        });
 
         return res.status(200).json({
             message: "Deleted Post!",
@@ -254,11 +276,19 @@ exports.editPost = async (req, res, next) => {
     const result = validationResult(req);
 
     if (!result.isEmpty()) {
+        if (image) {
+            try {
+                await fs.unlink(image.path);
+            } catch (err) {
+                console.log(err);
+            }
+        }
+
         return sendErrorRes(res, result);
     } else {
         try {
             post = await Post.findOneAndUpdate(
-                {_id: req.params.postId, creator: req.user._id},
+                { _id: req.params.postId, creator: req.user._id },
                 { title, content },
                 { new: true }
             );
@@ -268,6 +298,7 @@ exports.editPost = async (req, res, next) => {
         }
 
         if (post) {
+            post._doc.creator = { _id: req.user._id, name: req.user.name };
             if (image) {
                 // change image name
                 const imageType = image.mimetype.split("/")[1];
@@ -292,6 +323,12 @@ exports.editPost = async (req, res, next) => {
                 }
             }
 
+            // fire an event on the socket channels
+            socketServer.getIO().emit("posts", {
+                action: "edit",
+                post,
+            });
+
             return res.status(200).json({
                 message: "Post updated!",
                 post,
@@ -304,7 +341,7 @@ exports.editPost = async (req, res, next) => {
                     console.log(err);
                 }
             }
-            
+
             return res.status(403).json({
                 message: "Not authorized!",
             });
